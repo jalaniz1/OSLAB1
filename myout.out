@@ -3,9 +3,12 @@
 # trace10.txt - Process fg builtin command. 
 #
 tsh> ./myspin 4 &
-[1] (9532) ./myspin 4 &
+[1] (14030) ./myspin 4 &
 tsh> fg %1
+No current FG process, FG this pid 14030
 tsh> jobs
-[1] (9532) Foreground ./myspin 4 &
+Sending suspend signal to 14030
+[1] (14030) Foreground ./myspin 4 &
 tsh> fg %1
+Just finished waiting for the current foreground process 14030
 tsh> jobs

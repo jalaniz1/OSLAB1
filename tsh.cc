@@ -197,10 +197,19 @@ void eval(char *cmdline) // Finished Eval func JA 1:47pm 2/3/2013
     {
       sigprocmask(SIG_UNBLOCK, &mask, NULL); /* UnBlock SIGCHLD (inherited) */
      setpgid(0,0); // Set group id to zero,zero
+    
+      /* Background jobs should ignore SIGINT (ctrl-c)  */
+      /* and SIGTSTP (ctrl-z) */
     if (bg)
       {
         Signal(SIGINT, SIG_IGN); // Install ignore singal handler
         Signal(SIGTSTP,SIG_IGN); // Install ignore signal handler
+      }
+      else
+      {
+        // This might be redundant...
+        Signal(SIGINT, SIG_DFL);
+        Signal(SIGTSTP, SIG_DFL);
       }
       
     if (execve(argv[0],argv, environ )< 0){ // Environ is defined in unistd.h
@@ -217,6 +226,10 @@ void eval(char *cmdline) // Finished Eval func JA 1:47pm 2/3/2013
       waitfg(pid);
   else
       printf("[%d] (%d) %s",jid, pid, cmdline);
+  if (pid == 0)
+    pause(); // Until a kill signal is received
+  else if (pid > 0)
+    kill(pid, SIGCHLD);
  
   }
   //exit(0);
@@ -301,12 +314,14 @@ void do_bgfg(char **argv)
   {
     kill(jobp->pid,SIGCONT);
     updatejob(jobs,jobp->pid,FG); // Update it, function taken verbatim from shell.c in ECF folder - JA 1:01AM 2/3/2013 
+    printf("No current FG process, FG this pid %d\n",jobp->pid);
   }
   else
   {
     kill(curfg,SIGTSTP);
     updatejob(jobs,curfg,ST); // Update it, function taken verbatim from shell.c in ECF folder - JA 1:01AM 2/3/2013
     waitfg(curfg);
+    printf("Just finished waiting for the current foreground process %d\n", curfg);
   
     kill(jobp->pid, SIGCONT); // Allow the designated pid to continue as a foreground process
     updatejob(jobs, jobp->pid,FG);
@@ -318,6 +333,8 @@ void do_bgfg(char **argv)
   updatejob(jobs, jobp->pid, BG);
   printf("[%d] (%d) %s ",jobp->jid, jobp->pid, jobp->cmdline);
  }
+ jobp = NULL;
+ free(jobp);
   return;
 }
 
@@ -394,7 +411,7 @@ void sigchld_handler(int sig)
     unix_error("sigchld_handler wait error");
   if (verbose)
     printf("sigchld_handler: exiting\n");
-  Signal(SIGCHLD, sigchld_handler);  // Re-install
+  //Signal(SIGCHLD, sigchld_handler);  // Re-install
   return;
   // Implied return
 }
@@ -434,7 +451,7 @@ void sigtstp_handler(int sig)
    pid_t fpid = fgpid(jobs);
    //if (!fpid)
      // unix_error("Fpid is zero");
-  
+    printf("Sending suspend signal to %d\n", fpid);
    kill(-fpid, SIGTSTP);
    //updatejob(jobs,fpid,ST); // Send it to the foreground
   //Signal(SIGTSTP, sigtstp_handler); // Re-install ctrl-z

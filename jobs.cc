@@ -155,7 +155,7 @@ void listjobs(struct job_t *jobs)
 			   i, jobs[i].state);
 	    }
 	    printf("%s", jobs[i].cmdline);
-	}
+		}
     }
 }
 /*  Update it, function taken verbatim from shell.c in ECF folder - JA 1:01AM 2/3/2013 */
