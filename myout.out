@@ -1,0 +1,11 @@
+./sdriver.pl -t trace10.txt -s ./tsh -a "-p"
+#
+# trace10.txt - Process fg builtin command. 
+#
+tsh> ./myspin 4 &
+[1] (9532) ./myspin 4 &
+tsh> fg %1
+tsh> jobs
+[1] (9532) Foreground ./myspin 4 &
+tsh> fg %1
+tsh> jobs
