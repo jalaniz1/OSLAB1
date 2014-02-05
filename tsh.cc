@@ -191,6 +191,7 @@ void eval(char *cmdline) // Finished Eval func JA 1:47pm 2/3/2013
   if (!builtin_cmd(argv))
   {
     // Initialize with sigempty
+    sigemptyset(&mask);
     sigprocmask(SIG_BLOCK, &mask, NULL); /* Block SIGCHLD */
     sigaddset(&mask,SIGCHLD);
     
@@ -203,8 +204,8 @@ void eval(char *cmdline) // Finished Eval func JA 1:47pm 2/3/2013
       /* and SIGTSTP (ctrl-z) */
     if (bg)
       {
-        Signal(SIGINT, SIG_IGN); // Install ignore singal handler
-        Signal(SIGTSTP,SIG_IGN); // Install ignore signal handler
+        Signal(SIGINT, SIG_DFL); // Install ignore singal handler
+        Signal(SIGTSTP,SIG_DFL); // Install ignore signal handler
       }
       
     if (execve(argv[0],argv, environ )< 0){ // Environ is defined in unistd.h
@@ -305,25 +306,34 @@ void do_bgfg(char **argv)
  if (!strcmp(cmd, "fg"))
  {
   pid_t curfg = fgpid(jobs);
+   
   if (curfg == 0) // No current forground process
   {
-  
+    if (jobp->state == BG)
+    {
+      //printf("Red flag, we have a BG trying to go into the FG\n");
+    
+      kill(jobp->pid, SIGCONT);
+      updatejob(jobs,jobp->pid,FG); 
+    }
+    else
+    {
     kill(jobp->pid,SIGCONT);
     updatejob(jobs,jobp->pid,FG); // Update it, function taken verbatim from shell.c in ECF folder - JA 1:01AM 2/3/2013 
-    //Signal(SIGINT, SIG_DFL);
-    //Signal(SIGTSTP, SIG_DFL);
     //printf("No current FG process, FG this pid %d\n",jobp->pid);
+    }
+    waitfg(jobp->pid);
   }
   else
   {
+    //printf("Entering here\n");
     kill(curfg,SIGTSTP);
     updatejob(jobs,curfg,ST); // Update it, function taken verbatim from shell.c in ECF folder - JA 1:01AM 2/3/2013
     waitfg(curfg);
     //printf("Just finished waiting for the current foreground process %d\n", curfg);
     kill(jobp->pid, SIGCONT); // Allow the designated pid to continue as a foreground process
     updatejob(jobs, jobp->pid,FG);
-    //Signal(SIGINT, SIG_DFL);
-      //Signal(SIGTSTP, SIG_DFL);
+    
  }
  
 
@@ -348,6 +358,7 @@ void waitfg(pid_t pid)
 {
 
 int status = -1;
+
 // Changed third '0' arg to WUNTRACED (waiting for FG job to stop) - JA 8:47pm 2/2/2013
   if (waitpid(pid,&status,WUNTRACED) < 0)               //wait for pid to 
       unix_error("waitfg: waitpd error");      //no longer be in FG
@@ -451,8 +462,9 @@ void sigtstp_handler(int sig)
    
    pid_t fpid = fgpid(jobs);
 
-    //printf("Sending suspend signal to %d\n", fpid);
-   kill(-fpid, SIGTSTP);
+   // printf("Sending suspend signal to %d\n", fpid);
+   //kill(-fpid, SIGSTOP);
+   kill(-fpid,SIGTSTP);
    //updatejob(jobs,fpid,ST); // Send it to the foreground
   //Signal(SIGTSTP, sigtstp_handler); // Re-install ctrl-z
 }
