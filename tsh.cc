@@ -209,7 +209,7 @@ void eval(char *cmdline) // Finished Eval func JA 1:47pm 2/3/2013
       }
       
     if (execve(argv[0],argv, environ )< 0){ // Environ is defined in unistd.h
-      printf("%s: Command not found.\n", argv[0]);
+      printf("%s: Command not found\n", argv[0]);
       fflush(stdout);
       exit(0); // Kill the forked process!
 
@@ -254,7 +254,10 @@ int builtin_cmd(char **argv) // builtin_cmd finished - JA 1:35pm 2/3/2013
         return 1;
     }
     else
+    {
       do_bgfg(argv);
+      return 1;
+    }
     return 1;}
   if(!strcmp(cmd, "&"))  /* ignore singleton & */
     return 1;
@@ -309,38 +312,38 @@ void do_bgfg(char **argv)
    
   if (curfg == 0) // No current forground process
   {
+    //printf("Curfg ==0\n");
     if (jobp->state == BG)
     {
       //printf("Red flag, we have a BG trying to go into the FG\n");
     
-      kill(jobp->pid, SIGCONT);
+      kill(-jobp->pid, SIGCONT);
       updatejob(jobs,jobp->pid,FG); 
     }
-    else
+    else // What if it's been stopped?
     {
-    kill(jobp->pid,SIGCONT);
+     // printf("No current FG process, FG this pid %d\n",jobp->pid);
+    kill(-jobp->pid,SIGCONT);
     updatejob(jobs,jobp->pid,FG); // Update it, function taken verbatim from shell.c in ECF folder - JA 1:01AM 2/3/2013 
-    //printf("No current FG process, FG this pid %d\n",jobp->pid);
+    
     }
     waitfg(jobp->pid);
-  }
+    }
   else
-  {
+    {
     //printf("Entering here\n");
-    kill(curfg,SIGTSTP);
+    kill(-curfg,SIGTSTP);
     updatejob(jobs,curfg,ST); // Update it, function taken verbatim from shell.c in ECF folder - JA 1:01AM 2/3/2013
     waitfg(curfg);
     //printf("Just finished waiting for the current foreground process %d\n", curfg);
-    kill(jobp->pid, SIGCONT); // Allow the designated pid to continue as a foreground process
+    kill(-jobp->pid, SIGCONT); // Allow the designated pid to continue as a foreground process
     updatejob(jobs, jobp->pid,FG);
     
- }
- 
-
+   }
   }
  if (!strcmp(cmd, "bg"))
  {
-  kill(jobp->pid, SIGCONT);
+  kill(-jobp->pid, SIGCONT);
   updatejob(jobs, jobp->pid, BG);
   printf("[%d] (%d) %s ",jobp->jid, jobp->pid, jobp->cmdline);
  }
