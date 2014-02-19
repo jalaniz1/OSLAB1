@@ -200,13 +200,7 @@ void eval(char *cmdline) // Finished Eval func JA 1:47pm 2/3/2013
       sigprocmask(SIG_UNBLOCK, &mask, NULL); /* UnBlock SIGCHLD (inherited) */
      setpgid(0,0); // Set group id to zero,zero
     
-      /* Background jobs should ignore SIGINT (ctrl-c)  */
-      /* and SIGTSTP (ctrl-z) */
-    if (bg)
-      {
-        Signal(SIGINT, SIG_DFL); // Install ignore singal handler
-        Signal(SIGTSTP,SIG_DFL); // Install ignore signal handler
-      }
+     
       
     if (execve(argv[0],argv, environ )< 0){ // Environ is defined in unistd.h
       printf("%s: Command not found\n", argv[0]);
@@ -222,13 +216,10 @@ void eval(char *cmdline) // Finished Eval func JA 1:47pm 2/3/2013
       waitfg(pid); // Lock up the foreground
   else
       printf("[%d] (%d) %s",jid, pid, cmdline); // Then it's running in the background
-  //if (pid == 0)
-    //pause(); // Until a kill signal is received
-  //else if (pid > 0)
-    //kill(pid, SIGCHLD);
+  
  
   }
-  //exit(0);
+  
   return;
 }
 
@@ -308,38 +299,10 @@ void do_bgfg(char **argv)
 
  if (!strcmp(cmd, "fg"))
  {
-  pid_t curfg = fgpid(jobs);
-   
-  if (curfg == 0) // No current forground process
-  {
-    //printf("Curfg ==0\n");
-    if (jobp->state == BG)
-    {
-      //printf("Red flag, we have a BG trying to go into the FG\n");
-    
-      kill(-jobp->pid, SIGCONT);
-      updatejob(jobs,jobp->pid,FG); 
-    }
-    else // What if it's been stopped?
-    {
-     // printf("No current FG process, FG this pid %d\n",jobp->pid);
+  
     kill(-jobp->pid,SIGCONT);
     updatejob(jobs,jobp->pid,FG); // Update it, function taken verbatim from shell.c in ECF folder - JA 1:01AM 2/3/2013 
-    
-    }
     waitfg(jobp->pid);
-    }
-  else
-    {
-    //printf("Entering here\n");
-    kill(-curfg,SIGTSTP);
-    updatejob(jobs,curfg,ST); // Update it, function taken verbatim from shell.c in ECF folder - JA 1:01AM 2/3/2013
-    waitfg(curfg);
-    //printf("Just finished waiting for the current foreground process %d\n", curfg);
-    kill(-jobp->pid, SIGCONT); // Allow the designated pid to continue as a foreground process
-    updatejob(jobs, jobp->pid,FG);
-    
-   }
   }
  if (!strcmp(cmd, "bg"))
  {
@@ -348,7 +311,7 @@ void do_bgfg(char **argv)
   printf("[%d] (%d) %s ",jobp->jid, jobp->pid, jobp->cmdline);
  }
  jobp = NULL;
- free(jobp);
+ free(jobp); // Clean up on user-land
   return;
 }
 
@@ -360,9 +323,9 @@ void do_bgfg(char **argv)
 void waitfg(pid_t pid)
 {
 
-int status = -1;
+int status = -1;  // Precationary init
 
-// Changed third '0' arg to WUNTRACED (waiting for FG job to stop) - JA 8:47pm 2/2/2013
+
   if (waitpid(pid,&status,WUNTRACED) < 0)               //wait for pid to 
       unix_error("waitfg: waitpd error");      //no longer be in FG
   
@@ -372,8 +335,7 @@ int status = -1;
     status = WSTOPSIG(status);
       int jid = pid2jid(pid); // Map the PID to a JID for output - JA 3:51AM 2/3/13
       printf("Job [%d] (%d) stopped by signal %d\n",jid, pid, status);
-    //sprintf(sbuf,"Job %d stopped by a-signal", pid);
-    //psignal(WSTOPSIG(status),sbuf);
+ 
     updatejob(jobs, pid, ST);
   } // Verbatim - ECF/Shell.c
 
@@ -384,8 +346,7 @@ int status = -1;
       status = WTERMSIG(status);
       int jid = pid2jid(pid); // Map the PID to a JID for output - JA 3:51AM 2/3/13
       printf("Job [%d] (%d) terminated by signal %d\n",jid, pid, status);
-      //sprintf(sbuf, "Job %d terminated by b-signal", pid);
-      //psignal(WTERMSIG(status), sbuf);
+
     }
     deletejob(jobs, pid);
     if (verbose)
@@ -426,8 +387,6 @@ void sigchld_handler(int sig)
     unix_error("sigchld_handler wait error");
   if (verbose)
     printf("sigchld_handler: exiting\n");
-  //Signal(SIGCHLD, sigchld_handler);  // Re-install
-  return;
   // Implied return
 }
 
@@ -442,13 +401,9 @@ void sigint_handler(int sig)
   if (verbose)
     printf("sigint_handler: shell caught SIGINT\n");
    
-   pid_t fpid = fgpid(jobs);
-   //if (!fpid)
-    //unix_error("Fpid is zero");
+   pid_t fpid = fgpid(jobs); // Retrieve foreground job
    
    kill(-fpid, SIGINT);
-   updatejob(jobs,fpid,ST); // Stop it
-   //Signal(SIGINT,  sigint_handler);   // Re-install ctrl-c
 }
 
 
@@ -463,13 +418,10 @@ void sigtstp_handler(int sig)
   if (verbose)
     printf("sigint_handler: shell caught SIGINT\n");
    
-   pid_t fpid = fgpid(jobs);
+   pid_t fpid = fgpid(jobs); // Retrieve the foreground job
 
-   // printf("Sending suspend signal to %d\n", fpid);
-   //kill(-fpid, SIGSTOP);
    kill(-fpid,SIGTSTP);
-   //updatejob(jobs,fpid,ST); // Send it to the foreground
-  //Signal(SIGTSTP, sigtstp_handler); // Re-install ctrl-z
+
 }
 
 
